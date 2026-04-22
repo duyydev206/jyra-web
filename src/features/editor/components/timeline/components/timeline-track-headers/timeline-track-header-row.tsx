@@ -1,0 +1,69 @@
+import { Button } from "antd";
+import { TimelineTrack } from "@/src/features/editor/types";
+import { HiOutlineEye, HiOutlineEyeSlash } from "react-icons/hi2";
+import { HiSpeakerWave, HiSpeakerXMark } from "react-icons/hi2";
+
+type TimelineTrackHeaderRowProps = {
+    track: TimelineTrack;
+    laneHeight: number;
+    displayIndex: number;
+};
+
+const TimelineTrackHeaderRow: React.FC<TimelineTrackHeaderRowProps> = ({
+    track,
+    laneHeight,
+    displayIndex,
+}: TimelineTrackHeaderRowProps) => {
+    const isHidden = track.isHidden;
+    const isMuted = track.isMuted;
+
+    return (
+        <div
+            className='flex w-full select-none border-black/20'
+            style={{ borderBottomWidth: 1 }}>
+            <div
+                className='group flex w-full shrink-0 items-center gap-2 truncate pl-4 text-xs bg-white'
+                style={{
+                    height: laneHeight - 1,
+                }}>
+                {/* Track index */}
+                <div className='w-4 text-right text-neutral-400'>
+                    {displayIndex}
+                </div>
+
+                {/* Action buttons */}
+                <div className='flex items-center'>
+                    <Button
+                        type='text'
+                        size='small'
+                        aria-label='Hide Track'
+                        className='flex items-center gap-1 rounded-sm p-1 hover:bg-black/5'
+                        icon={
+                            isHidden ? (
+                                <HiOutlineEyeSlash className='size-4 text-neutral-400 hover:text-black' />
+                            ) : (
+                                <HiOutlineEye className='size-4 text-neutral-400 hover:text-black' />
+                            )
+                        }
+                    />
+
+                    <Button
+                        type='text'
+                        size='small'
+                        aria-label='Mute Track'
+                        className='flex items-center gap-1 rounded-sm p-1 hover:bg-black/5'
+                        icon={
+                            isMuted ? (
+                                <HiSpeakerXMark className='size-4 text-neutral-400 hover:text-black' />
+                            ) : (
+                                <HiSpeakerWave className='size-4 text-neutral-400 hover:text-black' />
+                            )
+                        }
+                    />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default TimelineTrackHeaderRow;
