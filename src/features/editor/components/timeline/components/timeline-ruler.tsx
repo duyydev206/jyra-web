@@ -1,4 +1,4 @@
-import { Frame, Frames } from "@/src/features/editor/types/primitives";
+import { Frames } from "@/src/features/editor/types/primitives";
 import {
     TIMELINE_GUTTER_X,
     RULER_HEIGHT,
@@ -21,21 +21,7 @@ const formatTimecode = (frame: number, fps: number) => {
     const seconds = (totalSeconds % 60).toString().padStart(2, "0");
     const frameText = frames.toString().padStart(2, "0");
 
-    return `${minutes}:${seconds}:${frameText}${frameText != "00" ? "f" : ""}`;
-};
-
-const getMarkerStartFrame = (tickFrames: Frames, fps: number) => {
-    /**
-     * Finest detail is 15f, but labels must not start at:
-     * 00:00:15 | 00:00:30 | 00:00:45
-     * Start from the first full second instead:
-     * 00:01:00
-     */
-    if (tickFrames === 15) {
-        return fps;
-    }
-
-    return 0;
+    return `${minutes}:${seconds}:${frameText}${frameText !== "00" ? "f" : ""}`;
 };
 
 const TimelineRuler: React.FC<TimelineRulerProps> = ({
@@ -44,27 +30,22 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
     tickFrames,
     timelineWidth,
 }: TimelineRulerProps) => {
-    const startFrame = getMarkerStartFrame(tickFrames, fps);
-
-    const markers = [];
-    for (
-        let frame = startFrame;
-        frame <= visibleDurationInFrames;
-        frame += tickFrames
-    ) {
-        markers.push({
-            frame,
-            label: formatTimecode(frame, fps),
-        });
-    }
-
     const usableWidth = Math.max(0, timelineWidth - TIMELINE_GUTTER_X * 2);
+    const pixelsPerFrame =
+        visibleDurationInFrames > 0 ? usableWidth / visibleDurationInFrames : 0;
 
-    /**
-     * We space ticks by the real frame scale, not by evenly distributing labels.
-     * This keeps ruler spacing in sync with clip widths and playhead.
-     */
-    const stepWidth = tickFrames * (usableWidth / visibleDurationInFrames);
+    const tickCount = Math.floor(visibleDurationInFrames / tickFrames);
+
+    const markers = Array.from({ length: tickCount + 1 }, (_, index) => {
+        const frame = index * tickFrames;
+        const left = TIMELINE_GUTTER_X + frame * pixelsPerFrame;
+
+        return {
+            frame,
+            left,
+            label: formatTimecode(frame, fps),
+        };
+    });
 
     return (
         <div className='sticky top-0 z-1'>
@@ -75,27 +56,37 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
 
             <div
                 id='tick-headers'
-                className='flex overflow-hidden select-none h-7'
+                className='relative overflow-hidden select-none h-7'
                 style={{
                     width: timelineWidth,
-                    paddingLeft: TIMELINE_GUTTER_X,
                 }}>
                 {markers.map((marker) => (
                     <div
                         key={marker.frame}
-                        className='relative shrink-0'
+                        className='absolute top-0 h-7'
                         style={{
-                            width: stepWidth,
-                            minWidth: stepWidth,
+                            left: marker.left,
+                            width: 1,
                         }}>
                         <div
-                            className=' flex items-start truncate border-l border-l-gray-500 pt-3 pl-1 text-slate-800'
+                            className='absolute top-0 h-7 border-l border-l-gray-500'
                             style={{
-                                fontSize: 10,
-                                height: RULER_HEIGHT,
-                            }}>
-                            {marker.label}
-                        </div>
+                                left: 0,
+                            }}
+                        />
+
+                        {marker.label ? (
+                            <div
+                                className='absolute pt-3 pl-1 text-slate-800 whitespace-nowrap'
+                                style={{
+                                    top: 0,
+                                    left: 0,
+                                    fontSize: 10,
+                                    height: RULER_HEIGHT,
+                                }}>
+                                {marker.label}
+                            </div>
+                        ) : null}
                     </div>
                 ))}
             </div>
