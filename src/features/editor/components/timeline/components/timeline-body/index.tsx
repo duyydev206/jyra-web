@@ -4,14 +4,14 @@ import TimelineLaneBackgrounds from "./timeline-lane-backgrounds";
 import TimelineItemsLayer from "./timeline-items-layer";
 
 type TimelineBodyProps = {
-    width: number;
+    timelineWidth: number;
     lanes: TimelineTrackLaneLayout[];
     totalHeight: number;
     children?: React.ReactNode;
 };
 
 const TimelineBody: React.FC<TimelineBodyProps> = ({
-    width,
+    timelineWidth,
     lanes,
     totalHeight,
     children,
@@ -20,12 +20,12 @@ const TimelineBody: React.FC<TimelineBodyProps> = ({
         <div
             className='relative'
             style={{
-                width,
+                width: timelineWidth,
                 height: totalHeight,
                 paddingLeft: TIMELINE_GUTTER_X,
                 paddingRight: TIMELINE_GUTTER_X,
             }}>
-            <TimelineLaneBackgrounds width={width} lanes={lanes} />
+            <TimelineLaneBackgrounds width={timelineWidth} lanes={lanes} />
             <TimelineItemsLayer>{children}</TimelineItemsLayer>
         </div>
     );

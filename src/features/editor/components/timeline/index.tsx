@@ -1,3 +1,5 @@
+"use client";
+
 import Playhead from "./components/playhead";
 import TimelineRuler from "./components/timeline-ruler";
 import TimelineToolbar from "./components/timeline-toolbar";
@@ -6,143 +8,34 @@ import TimelineItem from "./components/timeline-item";
 import { buildTrackLaneLayouts } from "../../lib/build-track-lane-layouts";
 import { buildClipLayouts } from "../../lib/build-clip-layouts";
 import TimelineTrackHeaders from "./components/timeline-track-headers";
-import { getTimelineContentWidth } from "../../lib/timeline-math";
-import { TimelineClip, TimelineTrack } from "../../types";
-
-const tracks: TimelineTrack[] = [
-    {
-        id: "track-1",
-        groupId: "group-1",
-        label: "Title",
-        kind: "text",
-        index: 0,
-        height: 35,
-        isLocked: false,
-        isMuted: false,
-        isHidden: false,
-    },
-    {
-        id: "track-2",
-        groupId: "group-1",
-        label: "Subtitle",
-        kind: "text",
-        index: 1,
-        height: 35,
-        isLocked: false,
-        isMuted: false,
-        isHidden: false,
-    },
-    {
-        id: "track-3",
-        groupId: "group-2",
-        label: "Audio",
-        kind: "audio",
-        index: 2,
-        height: 71,
-        isLocked: false,
-        isMuted: false,
-        isHidden: false,
-    },
-    {
-        id: "track-4",
-        groupId: "group-2",
-        label: "Video",
-        kind: "video",
-        index: 3,
-        height: 71,
-        isLocked: false,
-        isMuted: false,
-        isHidden: false,
-    },
-];
-
-const clips: TimelineClip[] = [
-    {
-        id: "clip-1",
-        trackId: "track-1",
-        type: "text",
-        from: 0,
-        durationInFrames: 90,
-        sourceStartFrame: 0,
-        label: "Edit this video",
-        color: "rgb(122, 93, 232)",
-        isLocked: false,
-        isHidden: false,
-        text: "Edit this video",
-        style: {
-            fontFamily: "Inter",
-            fontSize: 14,
-            color: "#ffffff",
-        },
-    },
-    {
-        id: "clip-2",
-        trackId: "track-2",
-        type: "text",
-        from: 120,
-        durationInFrames: 60,
-        sourceStartFrame: 0,
-        label: "Demo",
-        color: "rgb(122, 93, 232)",
-        isLocked: false,
-        isHidden: false,
-        text: "Demo",
-        style: {
-            fontFamily: "Inter",
-            fontSize: 14,
-            color: "#ffffff",
-        },
-    },
-    {
-        id: "clip-3",
-        trackId: "track-3",
-        type: "audio",
-        from: 60,
-        durationInFrames: 180,
-        sourceStartFrame: 0,
-        label: "Voice over",
-        color: "rgb(58, 122, 68)",
-        isLocked: false,
-        isHidden: false,
-        src: "/audio/voice.mp3",
-        sourceDurationInFrames: 180,
-        volume: 1,
-    },
-    {
-        id: "clip-4",
-        trackId: "track-4",
-        type: "video",
-        from: 180,
-        durationInFrames: 180,
-        sourceStartFrame: 0,
-        label: "Main footage",
-        color: "rgb(61, 94, 201)",
-        isLocked: false,
-        isHidden: false,
-        src: "/video/main.mp4",
-        sourceDurationInFrames: 180,
-        volume: 1,
-    },
-];
-
-const fps = 60;
-const durationInFrames = 100;
-const pixelsPerFrame = 2.5;
-const currentFrame = 90;
+// import { TimelineClip, TimelineTrack } from "../../types";
+import { useEditorStore } from "../../stores";
+// import { getPixelsPerFrame, getTimelineWidth } from "../../lib/timeline-math";
+import { computeTimelineZoom } from "../../lib/timeline-zoom-engine";
 
 const Timeline: React.FC = () => {
+    const project = useEditorStore((state) => state.project);
+    const runtime = useEditorStore((state) => state.runtime);
+
+    const tracks = project.tracks;
+    const clips = project.clips;
+    const fps = project.video.fps;
+    const durationInFrames = project.video.durationInFrames;
+    const currentFrame = runtime.player.currentFrame;
+    const zoomValue = runtime.timeline.zoom.zoomLevel;
     const laneResult = buildTrackLaneLayouts(tracks);
+    const zoomComputed = computeTimelineZoom({
+        durationInFrames,
+        fps,
+        zoomLevel: zoomValue,
+    });
+
     const clipLayouts = buildClipLayouts(
         clips,
         tracks,
         laneResult.layouts,
-        pixelsPerFrame,
+        zoomComputed.pixelsPerFrame,
     );
-
-    // const timelineWidth = getTimelineContentWidth(
-    //     durationInFrames,
-    //     pixelsPerFrame,
-    // );
 
     return (
         <div className='w-full max-h-full h-full flex flex-col'>
@@ -185,13 +78,16 @@ const Timeline: React.FC = () => {
                                 {/* ===== Tick header =====*/}
                                 <TimelineRuler
                                     fps={fps}
-                                    durationInFrames={durationInFrames}
-                                    pixelsPerFrame={pixelsPerFrame}
+                                    visibleDurationInFrames={
+                                        zoomComputed.visibleDurationInFrames
+                                    }
+                                    tickFrames={zoomComputed.tickFrames}
+                                    timelineWidth={zoomComputed.timelineWidth}
                                 />
 
                                 {/* ===== Track container ===== */}
                                 <TimelineBody
-                                    width={1949}
+                                    timelineWidth={zoomComputed.timelineWidth}
                                     lanes={laneResult.layouts}
                                     totalHeight={laneResult.totalHeight}>
                                     {clipLayouts.map((clipLayout) => (
@@ -205,8 +101,10 @@ const Timeline: React.FC = () => {
                                 {/* ===== Playhead ===== */}
                                 <Playhead
                                     currentFrame={currentFrame}
-                                    durationInFrames={durationInFrames}
-                                    pixelsPerFrame={pixelsPerFrame}
+                                    durationInFrames={
+                                        zoomComputed.visibleDurationInFrames
+                                    }
+                                    pixelsPerFrame={zoomComputed.pixelsPerFrame}
                                 />
                             </div>
                         </div>

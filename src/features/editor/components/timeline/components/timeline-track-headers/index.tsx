@@ -20,7 +20,7 @@ const TimelineTrackHeaders: React.FC<TimelineTrackHeadersProps> = ({
     return (
         <div
             id='track-headers'
-            className='border-editor-starter-border sticky left-0 flex w-full shrink-0 flex-col border-r'
+            className='border-editor-starter-border sticky left-0 flex w-full min-h-full shrink-0 flex-col border-r'
             style={{
                 height: totalHeight + RULER_HEIGHT,
                 paddingTop: RULER_HEIGHT,
