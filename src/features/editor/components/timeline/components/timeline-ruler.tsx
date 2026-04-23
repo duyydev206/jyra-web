@@ -57,11 +57,11 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
     durationInFrames,
     pixelsPerFrame,
 }: TimelineRulerProps) => {
-    const totalWidth = getTimelineContentWidth(
-        durationInFrames,
-        pixelsPerFrame,
-        TIMELINE_GUTTER_X,
-    );
+    // const totalWidth = getTimelineContentWidth(
+    //     durationInFrames,
+    //     pixelsPerFrame,
+    //     TIMELINE_GUTTER_X,
+    // );
 
     const stepFrames = pickMajorStepFrames(fps, pixelsPerFrame);
     const stepWidth = stepFrames * pixelsPerFrame;
@@ -79,24 +79,25 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
         <div className='sticky top-0 z-1'>
             <div
                 className='pointer-events-none absolute top-0 h-7 bg-gray-300'
-                style={{ width: totalWidth }}
+                style={{ width: 1949 }}
             />
 
             <div
                 id='tick-headers'
                 className='flex overflow-hidden select-none h-7'
                 style={{
-                    width: totalWidth,
+                    width: 1949,
                     paddingLeft: TIMELINE_GUTTER_X,
                 }}>
                 {markers.map((marker) => (
                     <div
                         key={marker.frame}
-                        className='relative shrink-0'
-                        style={{
-                            width: stepWidth,
-                            minWidth: stepWidth,
-                        }}>
+                        className='relative flex-1'
+                        // style={{
+                        //     width: stepWidth,
+                        //     minWidth: stepWidth,
+                        // }}
+                    >
                         <div
                             className=' flex items-start truncate border-l border-l-gray-500 pt-3 pl-1 text-slate-800'
                             style={{

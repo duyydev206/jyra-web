@@ -125,8 +125,8 @@ const clips: TimelineClip[] = [
     },
 ];
 
-const fps = 30;
-const durationInFrames = 600;
+const fps = 60;
+const durationInFrames = 100;
 const pixelsPerFrame = 2.5;
 const currentFrame = 90;
 
@@ -139,10 +139,10 @@ const Timeline: React.FC = () => {
         pixelsPerFrame,
     );
 
-    const timelineWidth = getTimelineContentWidth(
-        durationInFrames,
-        pixelsPerFrame,
-    );
+    // const timelineWidth = getTimelineContentWidth(
+    //     durationInFrames,
+    //     pixelsPerFrame,
+    // );
 
     return (
         <div className='w-full max-h-full h-full flex flex-col'>
@@ -181,9 +181,7 @@ const Timeline: React.FC = () => {
                                 className='absolute top-0 left-0 h-7 w z-20 bg-gray-300'
                                 style={{ width: "111px" }}></div>
 
-                            <div
-                                className='relative h-full'
-                                style={{ width: timelineWidth }}>
+                            <div className='relative h-full'>
                                 {/* ===== Tick header =====*/}
                                 <TimelineRuler
                                     fps={fps}
@@ -193,7 +191,7 @@ const Timeline: React.FC = () => {
 
                                 {/* ===== Track container ===== */}
                                 <TimelineBody
-                                    width={timelineWidth}
+                                    width={1949}
                                     lanes={laneResult.layouts}
                                     totalHeight={laneResult.totalHeight}>
                                     {clipLayouts.map((clipLayout) => (
