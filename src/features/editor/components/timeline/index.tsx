@@ -60,6 +60,7 @@ const Timeline: React.FC = () => {
     const scrubPreviewAnimationFrameRef = useRef<number | null>(null);
     const [clipDropPreview, setClipDropPreview] =
         useState<ClipDropPreview | null>(null);
+    const [draggingClipId, setDraggingClipId] = useState<string | null>(null);
     const project = useEditorStore((state) => state.project);
     const runtime = useEditorStore((state) => state.runtime);
     const selectedClipIds = useEditorStore(
@@ -82,12 +83,11 @@ const Timeline: React.FC = () => {
     const clips = project.clips;
     const fps = project.video.fps;
     const durationInFrames = project.video.durationInFrames;
-    const playbackDurationInFrames =
-        getEditorPlaybackDurationInFrames(project);
+    const playbackDurationInFrames = getEditorPlaybackDurationInFrames(project);
     const currentFrame = runtime.player.currentFrame;
     const playbackStatus = runtime.player.status;
     const zoomValue = runtime.timeline.zoom.zoomLevel;
-    const laneResult = buildTrackLaneLayouts(tracks);
+    const laneResult = buildTrackLaneLayouts(tracks, clips);
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -237,6 +237,8 @@ const Timeline: React.FC = () => {
     const handleClipDragStart = (event: DragStartEvent) => {
         const clipId = String(event.active.id);
 
+        setDraggingClipId(clipId);
+        setClipDropPreview(null);
         setSelectedClipIds([clipId]);
     };
 
@@ -250,6 +252,7 @@ const Timeline: React.FC = () => {
         const clipId = String(event.active.id);
         const dropPreview = getClipDropPreview(clipId, event.delta);
 
+        setDraggingClipId(null);
         setClipDropPreview(null);
 
         if (!dropPreview) return;
@@ -278,6 +281,7 @@ const Timeline: React.FC = () => {
     };
 
     const handleClipDragCancel = () => {
+        setDraggingClipId(null);
         setClipDropPreview(null);
     };
 
@@ -534,6 +538,28 @@ const Timeline: React.FC = () => {
         };
     }, [deleteSelectedClips]);
 
+    useEffect(() => {
+        const clearStaleClipDropPreview = () => {
+            // OLD logic: The ghost only cleared through dnd-kit end/cancel callbacks.
+            // NEW logic: Also clear it when the browser ends/cancels the pointer outside the dnd surface.
+            setDraggingClipId(null);
+            setClipDropPreview(null);
+        };
+
+        window.addEventListener("pointerup", clearStaleClipDropPreview);
+        window.addEventListener("pointercancel", clearStaleClipDropPreview);
+        window.addEventListener("blur", clearStaleClipDropPreview);
+
+        return () => {
+            window.removeEventListener("pointerup", clearStaleClipDropPreview);
+            window.removeEventListener(
+                "pointercancel",
+                clearStaleClipDropPreview,
+            );
+            window.removeEventListener("blur", clearStaleClipDropPreview);
+        };
+    }, []);
+
     return (
         <div className='w-full max-h-full h-full flex flex-col'>
             <TimelineToolbar />
@@ -609,8 +635,9 @@ const Timeline: React.FC = () => {
                                         }
                                         lanes={laneResult.layouts}
                                         totalHeight={
+                                            draggingClipId &&
                                             clipDropPreview?.createTrackPlacement ===
-                                            "below"
+                                                "below"
                                                 ? Math.max(
                                                       laneResult.totalHeight,
                                                       clipDropPreview.top +
@@ -619,7 +646,7 @@ const Timeline: React.FC = () => {
                                                   )
                                                 : laneResult.totalHeight
                                         }>
-                                        {clipDropPreview && (
+                                        {draggingClipId && clipDropPreview && (
                                             <div
                                                 className='pointer-events-none absolute rounded-sm border border-sky-500 bg-sky-500/20 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]'
                                                 style={{

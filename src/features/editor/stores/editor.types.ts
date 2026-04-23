@@ -1,4 +1,5 @@
 import {
+    ClipTransform,
     Frame,
     Frames,
     MediaAsset,
@@ -75,6 +76,10 @@ export type EditorStoreActions = {
     }) => void;
 
     // ===== Text Editing =====
+    updateClipTransform: (payload: {
+        clipId: string;
+        transform: Partial<ClipTransform>;
+    }) => void;
     startTextEditing: (payload: { clipId: string; draftText: string }) => void;
     updateTextDraft: (draftText: string) => void;
     stopTextEditing: () => void;

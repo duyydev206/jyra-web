@@ -6,6 +6,7 @@ import { ProjectVideoConfig } from "../../../types";
 import { useEditorStore } from "../../../stores";
 import EditorPreviewComposition from "../../../compositions/editor-composition";
 import { getRemotionPlayerDurationInFrames } from "../../../lib/playback-duration";
+import PreviewTextOverlay from "./preview-text-overlay";
 
 type PreviewStageProps = {
     playerRef: React.RefObject<PlayerRef | null>;
@@ -86,6 +87,12 @@ const PreviewStage: React.FC<PreviewStageProps> = ({
                     height: "100%",
                 }}
                 acknowledgeRemotionLicense
+            />
+            <PreviewTextOverlay
+                compositionWidth={video.width}
+                compositionHeight={video.height}
+                renderedWidth={width}
+                renderedHeight={height}
             />
         </div>
     );

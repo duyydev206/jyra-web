@@ -26,9 +26,9 @@ const clampFrame = (frame: number, durationInFrames: number) => {
 const DEFAULT_TRACK_HEIGHT_BY_KIND: Record<TrackMediaKind, number> = {
     text: 35,
     shape: 35,
-    audio: 71,
+    audio: 35,
     video: 71,
-    image: 71,
+    image: 35,
 };
 
 const CLIP_COLOR_BY_KIND: Record<TrackMediaKind, string> = {
@@ -378,6 +378,48 @@ const removeEmptyTracks = (
         tracks: tracksWithClips,
         trackGroups: nextTrackGroups,
     };
+};
+
+const syncClipLayerIndexesWithTrackOrder = (
+    clips: TimelineClip[],
+    tracks: TimelineTrack[],
+) => {
+    const nextLayerIndexByClipId = new Map<string, number>();
+    let nextLayerIndex = 0;
+
+    const tracksFromBottomToTop = [...tracks].sort((a, b) => {
+        return b.index - a.index;
+    });
+
+    for (const track of tracksFromBottomToTop) {
+        const trackClips = clips
+            .filter((clip) => clip.trackId === track.id)
+            .sort((a, b) => {
+                if (a.layerIndex !== b.layerIndex) {
+                    return a.layerIndex - b.layerIndex;
+                }
+
+                return a.from - b.from;
+            });
+
+        for (const clip of trackClips) {
+            nextLayerIndexByClipId.set(clip.id, nextLayerIndex);
+            nextLayerIndex += 1;
+        }
+    }
+
+    return clips.map((clip) => {
+        const layerIndex = nextLayerIndexByClipId.get(clip.id);
+
+        if (layerIndex === undefined || clip.layerIndex === layerIndex) {
+            return clip;
+        }
+
+        return {
+            ...clip,
+            layerIndex,
+        };
+    });
 };
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
@@ -852,7 +894,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
     // ===== Clip Creation =====
     addTextClipAtPlayhead: (payload) => {
-        const text = payload?.text?.trim() || "New text";
+        // OLD logic: New text was created passively with "New text" and required a later edit action.
+        // NEW logic: New text starts selected and editable in Preview, matching direct canvas editing.
+        const text = payload?.text?.trim() || "Text";
 
         set((state) => {
             const { trackId, tracks, trackGroups } = ensureTrackForKind(
@@ -906,6 +950,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
                         selectedTrackId: trackId,
                         selectedGroupId: null,
                     },
+                    textEditing: {
+                        editingClipId: clipId,
+                        draftText: text,
+                        isEditing: true,
+                    },
                 },
             };
         });
@@ -918,10 +967,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
                 asset.kind,
             );
             const clipId = getNextId(`clip-${asset.kind}`);
-            const durationInFrames = getMediaClipDuration(
-                state.project,
-                asset,
-            );
+            const durationInFrames = getMediaClipDuration(state.project, asset);
             const baseClip = {
                 id: clipId,
                 trackId,
@@ -1022,7 +1068,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
                       createTrackPlacement,
                   )
                 : null;
-            const projectTracks = trackPlacement?.tracks ?? state.project.tracks;
+            const projectTracks =
+                trackPlacement?.tracks ?? state.project.tracks;
             const projectTrackGroups =
                 trackPlacement?.trackGroups ?? state.project.trackGroups;
             const nextTrackId =
@@ -1073,7 +1120,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
                 projectTrackGroups,
                 movedClips,
             );
-            const clips = movedClips;
+            // OLD logic: Drag/drop changed clip.trackId but kept stale layerIndex, so Preview stacking could differ from Timeline.
+            // NEW logic: Rebuild layerIndex from lane order; upper Timeline lanes get higher layerIndex and render above lower lanes.
+            const clips = syncClipLayerIndexesWithTrackOrder(
+                movedClips,
+                tracks,
+            );
             const durationInFrames = getProjectDurationInFrames(clips);
 
             // OLD logic: Clip movement was constrained to same-kind lanes.
@@ -1116,6 +1168,32 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     },
 
     // ===== Text Editing =====
+    updateClipTransform: ({ clipId, transform }) => {
+        set((state) => ({
+            project: {
+                ...state.project,
+                clips: state.project.clips.map((clip) => {
+                    if (clip.id !== clipId) {
+                        return clip;
+                    }
+
+                    const baseTransform =
+                        clip.transform ?? getCenteredTransform(state.project);
+
+                    return {
+                        ...clip,
+                        // OLD logic: Preview text overlay could only select/edit text content.
+                        // NEW logic: Preview overlay can persist transform changes, starting with x/y movement.
+                        transform: {
+                            ...baseTransform,
+                            ...transform,
+                        },
+                    };
+                }),
+            },
+        }));
+    },
+
     startTextEditing: ({ clipId, draftText }) => {
         set((state) => ({
             runtime: {
@@ -1131,6 +1209,23 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
     updateTextDraft: (draftText) => {
         set((state) => ({
+            project: {
+                ...state.project,
+                clips: state.project.clips.map((clip) => {
+                    if (
+                        clip.id !== state.runtime.textEditing.editingClipId ||
+                        clip.type !== "text"
+                    ) {
+                        return clip;
+                    }
+
+                    return {
+                        ...clip,
+                        text: draftText,
+                        label: draftText.trim() || "Text",
+                    };
+                }),
+            },
             runtime: {
                 ...state.runtime,
                 textEditing: {
