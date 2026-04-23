@@ -62,6 +62,10 @@ export type EditorStoreActions = {
     setSelectedGroupId: (groupId: string | null) => void;
     clearSelection: () => void;
 
+    // ===== Track Controls =====
+    toggleTrackHidden: (trackId: string) => void;
+    toggleTrackMuted: (trackId: string) => void;
+
     // ===== Clip Creation =====
     addTextClipAtPlayhead: (payload?: {
         text?: string;

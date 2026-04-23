@@ -217,7 +217,7 @@ const EditableTextLayer: React.FC<{
             aria-label='Edit text clip'
             contentEditable={isEditing}
             suppressContentEditableWarning
-            className='rounded-[2px]'
+            className='rounded-xs'
             style={getTextOverlayStyle({
                 clip,
                 scaleX,
@@ -289,14 +289,19 @@ const PreviewTextOverlay: React.FC<PreviewTextOverlayProps> = ({
     const textEditing = useEditorStore((state) => state.runtime.textEditing);
 
     const visibleTextClips = useMemo(() => {
+        const trackMap = new Map(project.tracks.map((track) => [track.id, track]));
+
         return project.clips.filter((clip): clip is TextClip => {
+            const track = trackMap.get(clip.trackId);
+
             return (
                 clip.type === "text" &&
                 !clip.isHidden &&
+                !track?.isHidden &&
                 isTextVisibleAtFrame(clip, currentFrame)
             );
         });
-    }, [currentFrame, project.clips]);
+    }, [currentFrame, project.clips, project.tracks]);
     const scaleX = renderedWidth / compositionWidth;
     const scaleY = renderedHeight / compositionHeight;
 

@@ -201,7 +201,8 @@ const VideoClipLayer: React.FC<{
     clip: VideoClip;
     frame: number;
     trackOrder: number;
-}> = ({ clip, frame, trackOrder }) => {
+    isTrackMuted: boolean;
+}> = ({ clip, frame, trackOrder, isTrackMuted }) => {
     const { fps } = useVideoConfig();
     const localFrame = getClipLocalFrame(clip, frame);
     const transition = getBasicClipTransitionStyle(clip, localFrame, fps);
@@ -238,7 +239,7 @@ const VideoClipLayer: React.FC<{
                 src={clip.src}
                 startFrom={clip.sourceStartFrame}
                 endAt={clip.sourceStartFrame + clip.durationInFrames}
-                volume={clip.isMuted ? 0 : clip.volume}
+                volume={clip.isMuted || isTrackMuted ? 0 : clip.volume}
                 playbackRate={clip.playbackRate ?? 1}
                 // OLD logic: Video used "contain", which could leave black space around uploaded media.
                 // NEW logic: Uploaded video fills its clip bounds by default.
@@ -299,13 +300,14 @@ const ImageClipLayer: React.FC<{
 
 const AudioClipLayer: React.FC<{
     clip: AudioClip;
-}> = ({ clip }) => {
+    isTrackMuted: boolean;
+}> = ({ clip, isTrackMuted }) => {
     return (
         <Audio
             src={clip.src}
             startFrom={clip.sourceStartFrame}
             endAt={clip.sourceStartFrame + clip.durationInFrames}
-            volume={clip.isMuted ? 0 : clip.volume}
+            volume={clip.isMuted || isTrackMuted ? 0 : clip.volume}
             playbackRate={clip.playbackRate ?? 1}
         />
     );
@@ -338,12 +340,26 @@ const EditorPreviewComposition: React.FC<EditorPreviewCompositionProps> = ({
     const { width, height, fps } = useVideoConfig();
 
     const visibleSortedClips = useMemo(() => {
+        const trackMap = new Map(project.tracks.map((track) => [track.id, track]));
         const visible = project.clips.filter(
-            (clip) => !clip.isHidden && isClipVisibleAtFrame(clip, frame),
+            (clip) => {
+                const track = trackMap.get(clip.trackId);
+
+                // OLD logic: Preview only respected clip.isHidden.
+                // NEW logic: Track hide state hides all clips in that lane from Preview.
+                return (
+                    !clip.isHidden &&
+                    !track?.isHidden &&
+                    isClipVisibleAtFrame(clip, frame)
+                );
+            },
         );
 
         return sortVisualClipsForRender(visible, project.tracks);
     }, [frame, project.clips, project.tracks]);
+    const trackMap = useMemo(() => {
+        return new Map(project.tracks.map((track) => [track.id, track]));
+    }, [project.tracks]);
 
     return (
         <AbsoluteFill
@@ -357,6 +373,8 @@ const EditorPreviewComposition: React.FC<EditorPreviewCompositionProps> = ({
 
             {visibleSortedClips.map((clip) => {
                 const trackOrder = getClipLayerIndex(clip);
+                const track = trackMap.get(clip.trackId);
+                const isTrackMuted = track?.isMuted ?? false;
 
                 switch (clip.type) {
                     case "text":
@@ -377,6 +395,7 @@ const EditorPreviewComposition: React.FC<EditorPreviewCompositionProps> = ({
                                 clip={clip}
                                 frame={frame}
                                 trackOrder={trackOrder}
+                                isTrackMuted={isTrackMuted}
                             />
                         );
 
@@ -395,6 +414,7 @@ const EditorPreviewComposition: React.FC<EditorPreviewCompositionProps> = ({
                             <AudioClipLayer
                                 key={clip.id}
                                 clip={clip}
+                                isTrackMuted={isTrackMuted}
                             />
                         );
                     // END NEW LOGIC

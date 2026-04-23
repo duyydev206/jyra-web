@@ -892,6 +892,57 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         }));
     },
 
+    // ===== Track Controls =====
+    toggleTrackHidden: (trackId) => {
+        set((state) => ({
+            project: {
+                ...state.project,
+                tracks: state.project.tracks.map((track) => {
+                    if (track.id !== trackId) return track;
+
+                    return {
+                        ...track,
+                        // OLD logic: Track hide button only changed icon state locally.
+                        // NEW logic: Track hidden state lives in project data and drives Timeline + Preview visibility.
+                        isHidden: !track.isHidden,
+                    };
+                }),
+            },
+            runtime: {
+                ...state.runtime,
+                selection: {
+                    ...state.runtime.selection,
+                    selectedTrackId: trackId,
+                },
+            },
+        }));
+    },
+
+    toggleTrackMuted: (trackId) => {
+        set((state) => ({
+            project: {
+                ...state.project,
+                tracks: state.project.tracks.map((track) => {
+                    if (track.id !== trackId) return track;
+
+                    return {
+                        ...track,
+                        // OLD logic: Track mute button only changed icon state locally.
+                        // NEW logic: Track muted state lives in project data and drives Timeline + Preview audio.
+                        isMuted: !track.isMuted,
+                    };
+                }),
+            },
+            runtime: {
+                ...state.runtime,
+                selection: {
+                    ...state.runtime.selection,
+                    selectedTrackId: trackId,
+                },
+            },
+        }));
+    },
+
     // ===== Clip Creation =====
     addTextClipAtPlayhead: (payload) => {
         // OLD logic: New text was created passively with "New text" and required a later edit action.
