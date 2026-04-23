@@ -17,7 +17,7 @@ const TimelineBody: React.FC<TimelineBodyProps> = ({
 }) => {
     return (
         <div
-            className='relative'
+            className='relative min-w-full'
             style={{
                 width: timelineWidth,
                 height: totalHeight,

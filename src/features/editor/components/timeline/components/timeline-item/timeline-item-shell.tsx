@@ -11,14 +11,11 @@ const TimelineItemShell: React.FC<TimelineItemShellProps> = ({
 }) => {
     return (
         <div
-            className='absolute box-border h-full w-full overflow-hidden rounded-sm border select-none'
+            className='absolute box-border h-full w-full overflow-hidden rounded-md select-none'
             style={{
-                borderWidth: 1,
+                borderWidth: 1.5,
                 borderColor: isSelected ? "#2563eb" : "black",
                 cursor: isLocked ? "not-allowed" : "pointer",
-                boxShadow: isSelected
-                    ? "0 0 0 1px rgba(37,99,235,0.4)"
-                    : undefined,
             }}>
             {children}
         </div>

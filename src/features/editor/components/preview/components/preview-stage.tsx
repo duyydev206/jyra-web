@@ -5,10 +5,12 @@ import { Player, type PlayerRef } from "@remotion/player";
 import { ProjectVideoConfig } from "../../../types";
 import { useEditorStore } from "../../../stores";
 import EditorPreviewComposition from "../../../compositions/editor-composition";
+import { getRemotionPlayerDurationInFrames } from "../../../lib/playback-duration";
 
 type PreviewStageProps = {
     playerRef: React.RefObject<PlayerRef | null>;
     video: ProjectVideoConfig;
+    playbackDurationInFrames: number;
     width: number;
     height: number;
     isLoopEnabled: boolean;
@@ -20,6 +22,7 @@ type PreviewStageProps = {
 const PreviewStage: React.FC<PreviewStageProps> = ({
     playerRef,
     video,
+    playbackDurationInFrames,
     width,
     height,
     isLoopEnabled,
@@ -69,7 +72,9 @@ const PreviewStage: React.FC<PreviewStageProps> = ({
                 // OLD logic: inputProps={{}}
                 // NEW logic: Pass actual projected data from global store into Player
                 inputProps={{ project }}
-                durationInFrames={video.durationInFrames}
+                durationInFrames={getRemotionPlayerDurationInFrames(
+                    playbackDurationInFrames,
+                )}
                 fps={video.fps}
                 compositionWidth={video.width}
                 compositionHeight={video.height}

@@ -77,7 +77,7 @@ const TimelineItemContent: React.FC<TimelineItemContentProps> = ({
                                 {Array.from({ length: 12 }).map((_, index) => (
                                     <div
                                         key={index}
-                                        className='h-full flex-1 rounded-xs bg-white/20'
+                                        className='h-full flex-1 bg-white/20'
                                     />
                                 ))}
                             </div>

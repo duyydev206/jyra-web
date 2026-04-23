@@ -301,6 +301,26 @@ const AudioClipLayer: React.FC<{
     );
 };
 
+const EmptyPreviewState: React.FC = () => {
+    return (
+        <AbsoluteFill
+            style={{
+                alignItems: "center",
+                justifyContent: "center",
+                color: "rgba(253, 245, 245, 0.72)",
+                fontFamily: "Inter, Arial, sans-serif",
+                fontSize: 120,
+                fontWeight: 500,
+                textAlign: "center",
+                userSelect: "none",
+            }}>
+            <h1 className='px-10'>
+                Drop videos and images here to get started
+            </h1>
+        </AbsoluteFill>
+    );
+};
+
 const EditorPreviewComposition: React.FC<EditorPreviewCompositionProps> = ({
     project = fallbackProject,
 }) => {
@@ -327,6 +347,8 @@ const EditorPreviewComposition: React.FC<EditorPreviewCompositionProps> = ({
                 height,
                 overflow: "hidden",
             }}>
+            {project.clips.length === 0 && <EmptyPreviewState />}
+
             {visibleSortedClips.map((clip) => {
                 const trackOrder = trackIndexMap.get(clip.trackId) ?? 0;
 

@@ -143,7 +143,7 @@ const CLIPS: TimelineClip[] = [
 const getProjectDurationInFrames = (clips: TimelineClip[]) => {
     // OLD logic: Empty projects started at 60 frames.
     // NEW logic: Project duration represents real content length; timeline padding is handled by the timeline zoom layer.
-    if (clips.length === 0) return 1;
+    if (clips.length === 0) return 0;
 
     const maxClipEnd = clips.reduce((maxEnd, clip) => {
         return Math.max(maxEnd, clip.from + clip.durationInFrames);

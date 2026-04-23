@@ -1,3 +1,4 @@
+import type { PointerEvent } from "react";
 import { Frames } from "@/src/features/editor/types/primitives";
 import {
     TIMELINE_GUTTER_X,
@@ -7,6 +8,7 @@ import {
 type TimelineRulerProps = {
     fps: number;
     visibleDurationInFrames: Frames;
+    maxSeekFrame: Frames;
     tickFrames: Frames;
     timelineWidth: number;
     onSeekFrame?: (frame: number) => void;
@@ -28,6 +30,7 @@ const formatTimecode = (frame: number, fps: number) => {
 const TimelineRuler: React.FC<TimelineRulerProps> = ({
     fps,
     visibleDurationInFrames,
+    maxSeekFrame,
     tickFrames,
     timelineWidth,
     onSeekFrame,
@@ -49,33 +52,42 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
         };
     });
 
+    const seekFromPointer = (
+        event: PointerEvent<HTMLDivElement>,
+        shouldCapture: boolean,
+    ) => {
+        if (pixelsPerFrame <= 0) return;
+
+        if (shouldCapture) {
+            event.currentTarget.setPointerCapture(event.pointerId);
+        }
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const frame = Math.round((x - TIMELINE_GUTTER_X) / pixelsPerFrame);
+
+        onSeekFrame?.(Math.max(0, Math.min(frame, maxSeekFrame)));
+    };
+
     return (
         <div className='sticky top-0 z-1'>
             <div
-                className='pointer-events-none absolute top-0 h-7 bg-gray-300'
+                className='min-w-full pointer-events-none absolute top-0 h-7 bg-gray-300'
                 style={{ width: timelineWidth }}
             />
 
             <div
                 id='tick-headers'
-                className='relative overflow-hidden select-none h-7 cursor-pointer'
+                className='relative min-w-full overflow-hidden select-none h-7 cursor-pointer'
                 onPointerDown={(event) => {
-                    if (pixelsPerFrame <= 0) return;
-
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    const x = event.clientX - rect.left;
-                    const frame = Math.round(
-                        (x - TIMELINE_GUTTER_X) / pixelsPerFrame,
-                    );
-
                     // OLD logic: Ruler was display-only.
-                    // NEW logic: Clicking the ruler seeks the shared player frame.
-                    onSeekFrame?.(
-                        Math.max(
-                            0,
-                            Math.min(frame, visibleDurationInFrames - 1),
-                        ),
-                    );
+                    // NEW logic: Clicking or dragging the ruler scrubs the shared player frame.
+                    seekFromPointer(event, true);
+                }}
+                onPointerMove={(event) => {
+                    if (event.buttons !== 1) return;
+
+                    seekFromPointer(event, false);
                 }}
                 style={{
                     width: timelineWidth,

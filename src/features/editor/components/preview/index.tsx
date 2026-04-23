@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { PlayerRef } from "@remotion/player";
 import { PreviewViewportState } from "../../types/preview";
 import { useElementSize } from "./hooks/use-element-size";
@@ -10,13 +10,19 @@ import {
     useLoopEnabled,
     usePreviewFullscreen,
 } from "../../stores";
+import { getEditorPlaybackDurationInFrames } from "../../lib/playback-duration";
 
 const EditorPlayer = () => {
     const playerRef = useRef<PlayerRef>(null);
     const { ref, size } = useElementSize<HTMLDivElement>();
 
-    const video = useEditorStore((state) => state.project.video);
-    const player = useEditorStore((state) => state.runtime.player);
+    const project = useEditorStore((state) => state.project);
+    const video = project.video;
+    const playbackDurationInFrames =
+        getEditorPlaybackDurationInFrames(project);
+    const playbackStatus = useEditorStore(
+        (state) => state.runtime.player.status,
+    );
     const isLoopEnabled = useLoopEnabled();
     const isFullscreen = usePreviewFullscreen();
     const setCurrentFrame = useEditorStore((state) => state.setCurrentFrame);
@@ -27,28 +33,28 @@ const EditorPlayer = () => {
         (state) => state.setPreviewContainerSize,
     );
 
-    const handlePause = () => {
+    const handlePause = useCallback(() => {
         const currentFrameInPlayer = playerRef.current?.getCurrentFrame();
         const isEnded =
             currentFrameInPlayer !== undefined &&
-            currentFrameInPlayer >= video.durationInFrames - 1;
+            currentFrameInPlayer >= playbackDurationInFrames - 1;
 
         if (isEnded) {
             // OLD logic: The UI stayed on the last renderable frame, e.g. 04.96 for a 5s clip at 30fps.
             // NEW logic: The UI playhead moves to the end boundary while Remotion keeps rendering the final frame.
-            setCurrentFrame(video.durationInFrames);
+            setCurrentFrame(playbackDurationInFrames);
             setPlaybackStatus("ended");
             return;
         }
 
         setPlaybackStatus("paused");
-    };
+    }, [playbackDurationInFrames, setCurrentFrame, setPlaybackStatus]);
 
-    const handleFrameUpdate = (frame: number) => {
+    const handleFrameUpdate = useCallback((frame: number) => {
         const { runtime } = useEditorStore.getState();
-        const isLastRenderableFrame = frame >= video.durationInFrames - 1;
+        const isLastRenderableFrame = frame >= playbackDurationInFrames - 1;
         const isUiAtEndBoundary =
-            runtime.player.currentFrame >= video.durationInFrames;
+            runtime.player.currentFrame >= playbackDurationInFrames;
 
         if (
             isLastRenderableFrame &&
@@ -60,7 +66,11 @@ const EditorPlayer = () => {
         }
 
         setCurrentFrame(frame);
-    };
+    }, [playbackDurationInFrames, setCurrentFrame]);
+
+    const handlePlay = useCallback(() => {
+        setPlaybackStatus("playing");
+    }, [setPlaybackStatus]);
 
     const viewport = useMemo<PreviewViewportState>(() => {
         return {
@@ -84,7 +94,19 @@ const EditorPlayer = () => {
         const instance = playerRef.current;
         if (!instance) return;
 
-        if (player.status === "playing") {
+        if (playbackStatus === "playing") {
+            const { runtime, project } = useEditorStore.getState();
+            const playbackDuration =
+                getEditorPlaybackDurationInFrames(project);
+            const frameForPlayer = Math.min(
+                runtime.player.currentFrame,
+                Math.max(0, playbackDuration - 1),
+            );
+
+            if (instance.getCurrentFrame() !== frameForPlayer) {
+                instance.seekTo(frameForPlayer);
+            }
+
             if (!instance.isPlaying()) {
                 instance.play();
             }
@@ -94,25 +116,40 @@ const EditorPlayer = () => {
         if (instance.isPlaying()) {
             instance.pause();
         }
-    }, [player.status]);
+    }, [playbackStatus, playbackDurationInFrames]);
 
     // Sync currentFrame từ store -> Remotion Player
     useEffect(() => {
-        const instance = playerRef.current;
-        if (!instance) return;
+        return useEditorStore.subscribe((state, previousState) => {
+            const instance = playerRef.current;
+            if (!instance) return;
+            if (state.runtime.player.status === "playing") return;
 
-        const currentFrameInPlayer = instance.getCurrentFrame();
-        const frameForPlayer = Math.min(
-            player.currentFrame,
-            Math.max(0, video.durationInFrames - 1),
-        );
+            const currentFrameChanged =
+                state.runtime.player.currentFrame !==
+                previousState.runtime.player.currentFrame;
+            const durationChanged =
+                state.project.video.durationInFrames !==
+                    previousState.project.video.durationInFrames ||
+                state.project.clips.length !== previousState.project.clips.length;
 
-        if (currentFrameInPlayer !== frameForPlayer) {
-            // OLD logic: UI frame and Remotion seek frame were always identical.
-            // NEW logic: UI can sit on the end boundary; Remotion still seeks to the last real frame.
-            instance.seekTo(frameForPlayer);
-        }
-    }, [player.currentFrame, video.durationInFrames]);
+            if (!currentFrameChanged && !durationChanged) return;
+
+            const playbackDuration =
+                getEditorPlaybackDurationInFrames(state.project);
+            const currentFrameInPlayer = instance.getCurrentFrame();
+            const frameForPlayer = Math.min(
+                state.runtime.player.currentFrame,
+                Math.max(0, playbackDuration - 1),
+            );
+
+            if (currentFrameInPlayer !== frameForPlayer) {
+                // OLD logic: EditorPlayer subscribed to currentFrame and re-rendered the Player tree every frame.
+                // NEW logic: External seeks sync imperatively so heavy video preview does not re-render each frame.
+                instance.seekTo(frameForPlayer);
+            }
+        });
+    }, []);
 
     return (
         <>
@@ -123,12 +160,11 @@ const EditorPlayer = () => {
                     <PreviewViewport
                         playerRef={playerRef}
                         video={video}
+                        playbackDurationInFrames={playbackDurationInFrames}
                         viewport={viewport}
                         isLoopEnabled={isLoopEnabled}
                         onFrameUpdate={handleFrameUpdate}
-                        onPlay={() => {
-                            setPlaybackStatus("playing");
-                        }}
+                        onPlay={handlePlay}
                         onPause={handlePause}
                     />
                 </div>
@@ -138,12 +174,13 @@ const EditorPlayer = () => {
                         <PreviewViewport
                             playerRef={playerRef}
                             video={video}
+                            playbackDurationInFrames={
+                                playbackDurationInFrames
+                            }
                             viewport={viewport}
                             isLoopEnabled={isLoopEnabled}
                             onFrameUpdate={handleFrameUpdate}
-                            onPlay={() => {
-                                setPlaybackStatus("playing");
-                            }}
+                            onPlay={handlePlay}
                             onPause={handlePause}
                         />
                     </div>

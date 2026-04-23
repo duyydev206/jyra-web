@@ -10,6 +10,7 @@ import type {
     TimelineTrackGroup,
     TrackMediaKind,
 } from "../types";
+import { getEditorPlaybackDurationInFrames } from "../lib/playback-duration";
 
 const clamp = (value: number, min: number, max: number) => {
     return Math.max(min, Math.min(value, max));
@@ -45,7 +46,7 @@ const getNextId = (prefix: string) => {
 const getProjectDurationInFrames = (clips: TimelineClip[]) => {
     // OLD logic: Empty projects started at 60 frames.
     // NEW logic: Project duration represents real content length; timeline padding is handled by the timeline zoom layer.
-    if (clips.length === 0) return 1;
+    if (clips.length === 0) return 0;
 
     const maxClipEnd = clips.reduce((maxEnd, clip) => {
         return Math.max(maxEnd, clip.from + clip.durationInFrames);
@@ -192,12 +193,50 @@ const getMediaClipDuration = (project: EditorProject, asset: MediaAsset) => {
     return asset.durationInFrames ?? project.video.fps * 5;
 };
 
+const removeEmptyTracks = (
+    tracks: TimelineTrack[],
+    trackGroups: TimelineTrackGroup[],
+    clips: TimelineClip[],
+) => {
+    const usedTrackIds = new Set(clips.map((clip) => clip.trackId));
+    const tracksWithClips = tracks
+        .filter((track) => usedTrackIds.has(track.id))
+        .sort((a, b) => a.index - b.index)
+        .map((track, index) => ({
+            ...track,
+            index,
+        }));
+    const remainingTrackIds = new Set(tracksWithClips.map((track) => track.id));
+
+    const nextTrackGroups = trackGroups.flatMap((group) => {
+        const trackIds = group.trackIds.filter((trackId) => {
+            return remainingTrackIds.has(trackId);
+        });
+
+        if (trackIds.length === 0) {
+            return [];
+        }
+
+        return [
+            {
+                ...group,
+                trackIds,
+            },
+        ];
+    });
+
+    return {
+        tracks: tracksWithClips,
+        trackGroups: nextTrackGroups,
+    };
+};
+
 export const useEditorStore = create<EditorStore>((set, get) => ({
     ...INITIAL_EDITOR_STATE,
 
     // ===== Player =====
     setCurrentFrame: (frame) => {
-        const duration = get().project.video.durationInFrames;
+        const duration = getEditorPlaybackDurationInFrames(get().project);
 
         set((state) => ({
             runtime: {
@@ -228,7 +267,17 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
                 ...state.runtime,
                 player: {
                     ...state.runtime.player,
-                    status: "playing",
+                    // OLD logic: Playing from the end boundary could ask Remotion to play from its final renderable frame.
+                    // NEW logic: Restart from frame 0 when play is requested at the project end.
+                    currentFrame:
+                        state.runtime.player.currentFrame >=
+                        getEditorPlaybackDurationInFrames(state.project)
+                            ? 0
+                            : state.runtime.player.currentFrame,
+                    status:
+                        getEditorPlaybackDurationInFrames(state.project) <= 0
+                            ? "paused"
+                            : "playing",
                 },
             },
         }));
@@ -254,14 +303,24 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
                 ...state.runtime,
                 player: {
                     ...state.runtime.player,
-                    status: currentStatus === "playing" ? "paused" : "playing",
+                    currentFrame:
+                        currentStatus !== "playing" &&
+                        state.runtime.player.currentFrame >=
+                            getEditorPlaybackDurationInFrames(state.project)
+                            ? 0
+                            : state.runtime.player.currentFrame,
+                    status:
+                        currentStatus === "playing" ||
+                        getEditorPlaybackDurationInFrames(state.project) <= 0
+                            ? "paused"
+                            : "playing",
                 },
             },
         }));
     },
 
     seekToFrame: (frame) => {
-        const duration = get().project.video.durationInFrames;
+        const duration = getEditorPlaybackDurationInFrames(get().project);
 
         set((state) => ({
             runtime: {
@@ -269,6 +328,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
                 player: {
                     ...state.runtime.player,
                     currentFrame: clampFrame(frame, duration),
+                    // OLD logic: Seeking while playing kept playback running.
+                    // NEW logic: User seek/scrub/skip pauses playback at the chosen frame.
+                    status:
+                        state.runtime.player.status === "playing"
+                            ? "paused"
+                            : state.runtime.player.status,
                 },
             },
         }));
@@ -276,7 +341,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
     seekByFrames: (delta) => {
         const currentFrame = get().runtime.player.currentFrame;
-        const duration = get().project.video.durationInFrames;
+        const duration = getEditorPlaybackDurationInFrames(get().project);
 
         set((state) => ({
             runtime: {
@@ -284,6 +349,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
                 player: {
                     ...state.runtime.player,
                     currentFrame: clampFrame(currentFrame + delta, duration),
+                    status:
+                        state.runtime.player.status === "playing"
+                            ? "paused"
+                            : state.runtime.player.status,
                 },
             },
         }));
@@ -824,7 +893,66 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     },
 
     deleteSelectedClips: () => {
-        console.log("deleteSelectedClips: not implemented yet");
+        set((state) => {
+            const selectedClipIds = new Set(
+                state.runtime.selection.selectedClipIds,
+            );
+
+            if (selectedClipIds.size === 0) {
+                return state;
+            }
+
+            const clips = state.project.clips.filter((clip) => {
+                return !selectedClipIds.has(clip.id);
+            });
+            const { tracks, trackGroups } = removeEmptyTracks(
+                state.project.tracks,
+                state.project.trackGroups,
+                clips,
+            );
+            const durationInFrames = getProjectDurationInFrames(clips);
+            const currentFrame =
+                clips.length === 0
+                    ? 0
+                    : clampFrame(
+                          state.runtime.player.currentFrame,
+                          getEditorPlaybackDurationInFrames({
+                              ...state.project,
+                              video: {
+                                  ...state.project.video,
+                                  durationInFrames,
+                              },
+                              clips,
+                          }),
+                      );
+
+            // OLD logic: Delete toolbar action was a stub.
+            // NEW logic: Remove selected clips, recalculate project duration, and clear stale selection.
+            return {
+                project: {
+                    ...state.project,
+                    trackGroups,
+                    tracks,
+                    clips,
+                    video: {
+                        ...state.project.video,
+                        durationInFrames,
+                    },
+                },
+                runtime: {
+                    ...state.runtime,
+                    player: {
+                        ...state.runtime.player,
+                        currentFrame,
+                    },
+                    selection: {
+                        selectedClipIds: [],
+                        selectedTrackId: null,
+                        selectedGroupId: null,
+                    },
+                },
+            };
+        });
     },
 
     undo: () => {
