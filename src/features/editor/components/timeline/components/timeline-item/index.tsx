@@ -62,7 +62,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                         top,
                         height,
                         position: "absolute",
-                        zIndex: isDragging ? 10000 : clip.layerIndex + 1,
+                        zIndex: isDragging ? 9999 : 5,
                         transform: CSS.Translate.toString(transform),
                         opacity: isDragging ? 0.82 : undefined,
                         touchAction: "none",

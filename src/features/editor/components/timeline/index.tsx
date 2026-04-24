@@ -195,18 +195,26 @@ const Timeline: React.FC = () => {
             };
         }
 
-        const sortedLanes = [...laneResult.layouts].sort((a, b) => a.top - b.top);
-        const betweenLanePreview = sortedLanes.slice(0, -1).find((lane, index) => {
-            const nextLane = sortedLanes[index + 1];
-            if (!nextLane) return false;
+        const sortedLanes = [...laneResult.layouts].sort(
+            (a, b) => a.top - b.top,
+        );
+        const betweenLanePreview = sortedLanes
+            .slice(0, -1)
+            .find((lane, index) => {
+                const nextLane = sortedLanes[index + 1];
+                if (!nextLane) return false;
 
-            const boundaryY = lane.top + lane.laneHeight;
+                const boundaryY = lane.top + lane.laneHeight;
 
-            return Math.abs(targetLaneCenterY - boundaryY) <= LANE_INSERT_SNAP_THRESHOLD;
-        });
+                return (
+                    Math.abs(targetLaneCenterY - boundaryY) <=
+                    LANE_INSERT_SNAP_THRESHOLD
+                );
+            });
 
         if (betweenLanePreview) {
-            const nextLane = sortedLanes[sortedLanes.indexOf(betweenLanePreview) + 1];
+            const nextLane =
+                sortedLanes[sortedLanes.indexOf(betweenLanePreview) + 1];
 
             if (nextLane) {
                 return {

@@ -69,8 +69,9 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
 
         if (previewSeekRafRef.current !== null) return;
 
-        previewSeekRafRef.current =
-            window.requestAnimationFrame(flushPreviewSeekFrame);
+        previewSeekRafRef.current = window.requestAnimationFrame(
+            flushPreviewSeekFrame,
+        );
     };
 
     const seekFromPointer = (

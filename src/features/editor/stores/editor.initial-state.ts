@@ -157,7 +157,7 @@ export const INITIAL_EDITOR_STATE: EditorState = {
         id: "project-1",
         name: "Untitled Project",
         video: {
-            fps: 30,
+            fps: 60,
             width: 1920,
             height: 1080,
             durationInFrames: getProjectDurationInFrames(CLIPS),
