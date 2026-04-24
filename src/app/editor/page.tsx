@@ -20,9 +20,10 @@ const Editor = () => {
                     <div
                         className='col-span-6 min-h-0 min-w-0 grid grid-cols-4'
                         style={{
-                            gridTemplateRows: timelinePanelHeight
-                                ? `minmax(0, 1fr) minmax(0, 1fr) ${timelinePanelHeight}px`
-                                : undefined,
+                            gridTemplateRows:
+                                timelinePanelHeight != null
+                                    ? `minmax(0, 1fr) minmax(0, 1fr) ${timelinePanelHeight}px`
+                                    : `minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)`,
                         }}>
                         <div className='row-span-2 min-h-0 min-w-0 col-span-3 overflow-hidden border'>
                             <EditorPlayer />

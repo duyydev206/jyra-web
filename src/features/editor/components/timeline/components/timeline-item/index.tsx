@@ -49,6 +49,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             <div data-state='closed' style={{ display: "contents" }}>
                 <div
                     ref={setNodeRef}
+                    data-editor-focus-target='timeline-clip'
                     {...attributes}
                     {...listeners}
                     onClick={(event) => {
