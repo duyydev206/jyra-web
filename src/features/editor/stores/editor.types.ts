@@ -5,6 +5,9 @@ import {
     MediaAsset,
     Pixels,
     PlaybackStatus,
+    ProjectVideoConfig,
+    ShapeClip,
+    TextStyle,
 } from "../types";
 import { EditorState } from "../types/editor";
 
@@ -85,6 +88,36 @@ export type EditorStoreActions = {
     updateClipTransform: (payload: {
         clipId: string;
         transform: Partial<ClipTransform>;
+    }) => void;
+    updateProjectVideoConfig: (
+        videoConfig: Partial<ProjectVideoConfig>,
+    ) => void;
+    updateClipTiming: (payload: {
+        clipId: string;
+        from?: Frame;
+        durationInFrames?: Frames;
+    }) => void;
+    updateTextClipContent: (payload: { clipId: string; text: string }) => void;
+    updateTextClipStyle: (payload: {
+        clipId: string;
+        style: Partial<TextStyle>;
+    }) => void;
+    updateMediaClipSettings: (payload: {
+        clipId: string;
+        volume?: number;
+        playbackRate?: number;
+        isMuted?: boolean;
+    }) => void;
+    updateImageClipSettings: (payload: {
+        clipId: string;
+        objectFit?: "contain" | "cover" | "fill";
+    }) => void;
+    updateShapeClipStyle: (payload: {
+        clipId: string;
+        shapeType?: ShapeClip["shapeType"];
+        fill?: string;
+        stroke?: string;
+        strokeWidth?: number;
     }) => void;
     startTextEditing: (payload: { clipId: string; draftText: string }) => void;
     updateTextDraft: (draftText: string) => void;

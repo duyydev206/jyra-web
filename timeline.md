@@ -40,6 +40,28 @@ UI markup and Tailwind classes should be preserved unless a bug fix requires a m
 - Playhead line height must follow timeline layer height, not a hardcoded SVG path.
 - Timeline panel resizing must not trigger ruler seek or playhead scrub.
 
+### Zoom And Ruler Scale
+
+- `computeTimelineZoom` is the single source of truth for `timelineWidth`, `visibleDurationInFrames`, `pixelsPerFrame`, and `tickFrames`.
+- Timeline passes the measured scroll viewport width into `computeTimelineZoom`.
+- At zoom `1x`, timeline content width fits the visible viewport area after the track header, so projects of different lengths start with all clips in view.
+- Zooming above `1x` expands the timeline width from that measured viewport baseline by a duration-aware growth step.
+- Short projects use a minimum growth step derived from viewport width, while longer projects grow by project seconds.
+- Zoom width must keep increasing through zoom levels; do not cap width in a way that makes later zoom steps stop changing.
+- Visible duration is project duration plus tail padding, then snapped to the selected tick unit.
+- Tail padding scales with duration bucket: short projects get seconds of extra ruler space, long projects get minutes.
+- Empty and very short projects always show at least 10 seconds of ruler space.
+- Ruler tick unit is selected from real pixel density and a target marker density, not a fixed duration-to-zoom map. This prevents unreadably dense labels on long projects and allows finer ticks as zoom increases.
+- Tick spacing has a practical readable range and tick unit should become finer as zoom grows, but tick density must not block timeline width growth.
+- Supported whole-time tick units follow `1 / 5 / 10 / 30 / 60`, including seconds, minutes, and hours. Do not add `2x` or `15x` interval units.
+- The `15f` ruler mode only shows each second boundary and the `+15f` marker for that second.
+- Ruler labels use project duration, not visible padded duration: projects under 1 hour use `MM:SS`, projects from 1 hour use `HH:MM:SS`.
+- Frame labels are only shown for very short projects when `15f` zoom detail is active; otherwise `15f` markers stay symbolic without full timecode labels.
+- `15f` tick mode must not appear before zoom level 3.
+- When `15f` tick mode is active, all ruler labels use `MM:SS:FF` without an `f` suffix so labels stay visually consistent.
+- Symbolic `15f` markers are drawn halfway between two second markers. Their label is only a visual ruler hint and must not change frame-to-pixel math, seeking, playhead position, or preview sync.
+- Ruler labels, clip width, drag frame math, and playhead position must all use the same `pixelsPerFrame`.
+
 ### Timeline Panel Resize
 
 - Dragging the timeline resize handle changes timeline panel height.

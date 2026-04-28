@@ -552,6 +552,343 @@ Verification:
 
 ## Maintenance Log
 
+### 2026-04-26 - Unify Frame Detail Ruler Label Format
+
+Files changed:
+
+- `src/features/editor/components/timeline/components/timeline-ruler.tsx`
+- `TIMELINE.md`
+- `MAINTENANCE_PLAN.md`
+
+Old:
+
+- In `15f` mode, second markers used `MM:SS` while frame markers used `MM:SS:FFf`.
+- This mixed label lengths in the same ruler view.
+
+New:
+
+- In `15f` mode, all ruler labels use `MM:SS:FF`.
+- The `f` suffix was removed.
+
+Why:
+
+- Mixed label formats make the ruler harder to read and look inconsistent.
+- Users should not have to infer why some labels have four digits and others have six.
+
+Benefits:
+
+- Cleaner frame-detail ruler.
+- Consistent label width and meaning in the same zoom mode.
+
+Tradeoffs / Risks:
+
+- Frame detail labels now rely on context instead of the `f` suffix, but the format is consistent.
+
+Verification:
+
+- `npm run lint` passed.
+- `npm run build` passed.
+
+### 2026-04-26 - Add Minimum Ruler Duration And Delay Frame Ticks
+
+Files changed:
+
+- `src/features/editor/lib/timeline-zoom-engine.ts`
+- `TIMELINE.md`
+- `MAINTENANCE_PLAN.md`
+
+Old:
+
+- Empty projects showed about 1 second of ruler space.
+- Very short projects could enter `15f` tick mode too early.
+- Frame-level ruler detail could appear before the user had zoomed in enough to need it.
+
+New:
+
+- Empty and very short projects now show at least 10 seconds on the ruler.
+- `15f` tick mode is unavailable before zoom level 3.
+- Tick unit selection receives the current zoom level so frame-level detail can be gated by zoom depth.
+
+Why:
+
+- Short projects still need breathing room on the ruler.
+- Frame labels should be detail revealed by zoom, not default ruler noise.
+- The ruler should remain readable at low zoom.
+
+Benefits:
+
+- Cleaner initial ruler for short media.
+- More predictable transition from second-level ticks to frame-level hints.
+- Keeps preview/timeline sync unchanged because only visible duration and marker choice changed.
+
+Tradeoffs / Risks:
+
+- The exact zoom threshold for `15f` may need tuning after manual visual checks across common FPS values.
+
+Verification:
+
+- `npm run lint` passed.
+- `npm run build` passed.
+
+### 2026-04-26 - Replace Zoom Width Cap With Duration-Aware Growth
+
+Files changed:
+
+- `src/features/editor/lib/timeline-zoom-engine.ts`
+- `TIMELINE.md`
+- `MAINTENANCE_PLAN.md`
+
+Old:
+
+- The previous fix capped timeline width once the smallest visual tick reached a maximum spacing.
+- This prevented runaway width for very short projects, but it also made later zoom steps stop increasing.
+
+New:
+
+- Timeline width now grows from the measured `1x` viewport baseline by a duration-aware per-zoom-step value.
+- Short projects use a minimum growth derived from viewport width.
+- Longer projects grow by project duration in seconds.
+- Tick unit selection still adapts separately, but it no longer caps timeline width growth.
+
+Why:
+
+- Professional editors keep zoom increasing across levels, but the amount of growth depends on project duration.
+- Width should be computed by an algorithm, not hardcoded sample widths or a hard cap.
+
+Benefits:
+
+- A 3-second project grows gradually instead of exploding or plateauing.
+- A 3m30s project grows by thousands of pixels per step, similar to the measured editor behavior.
+- Ruler density and timeline width are decoupled, which keeps zoom behavior predictable.
+
+Tradeoffs / Risks:
+
+- Growth constants are calibrated from current measured examples and may need tuning with more real editor samples.
+- Very high zoom on long projects can still create large scroll widths by design.
+
+Verification:
+
+- `npm run lint` passed.
+- `npm run build` passed.
+
+### 2026-04-26 - Cap Timeline Zoom By Tick Spacing
+
+Files changed:
+
+- `src/features/editor/lib/timeline-zoom-engine.ts`
+- `TIMELINE.md`
+- `MAINTENANCE_PLAN.md`
+
+Old:
+
+- Timeline width grew from the viewport baseline with a fixed exponential scale.
+- Very short projects could reach extremely large widths at `10x`.
+- Once the ruler was already at the smallest visual tick, tick spacing could still grow to screen-sized gaps.
+
+New:
+
+- Zoom growth now uses a softer non-linear curve.
+- Timeline width is capped by the smallest visual tick interval.
+- Tick selection uses a readable min/target/max pixel spacing range instead of only aiming at one target value.
+
+Why:
+
+- Zooming should reveal more editing detail, but it should not create a ruler where neighboring ticks are separated by an entire screen.
+- Short projects need a much lower practical max width than long projects.
+
+Benefits:
+
+- A 4-second image clip no longer expands into a tens-of-thousands-pixel timeline at max zoom.
+- Ruler density stays usable at high zoom.
+- Clip/playhead/preview frame math remains synchronized because only the computed scale changes.
+
+Tradeoffs / Risks:
+
+- Max zoom for very short projects is intentionally capped earlier than before.
+- Future UX tuning may adjust the current tick spacing constants after visual testing.
+
+Verification:
+
+- `npm run lint` passed.
+- `npm run build` passed.
+
+### 2026-04-26 - Make 15f Ruler Marker Symbolic
+
+Files changed:
+
+- `src/features/editor/components/timeline/components/timeline-ruler.tsx`
+- `TIMELINE.md`
+- `MAINTENANCE_PLAN.md`
+
+Old:
+
+- The `15f` ruler marker was positioned at the real frame `secondStart + 15`.
+- On timelines where FPS is not 30, this made the visual distance from `00f` to `15f` different from the distance from `15f` to the next second.
+
+New:
+
+- The `15f` marker is drawn visually halfway between two second markers.
+- The marker keeps a symbolic `15f` label, but its visual frame is separate from the label frame.
+- Seeking, playhead movement, clip widths, and preview sync still use the real `pixelsPerFrame` timeline scale.
+
+Why:
+
+- The `15f` marker is intended as a ruler hint that there is a frame-level midpoint between seconds, not as a source-of-truth frame position.
+- Visual ruler hints must not distort the actual timeline frame math.
+
+Benefits:
+
+- Equal visual spacing between `00f -> 15f -> next second`.
+- Keeps Timeline and Preview sync safe.
+- Makes ruler frame detail easier to understand at high zoom.
+
+Tradeoffs / Risks:
+
+- The `15f` label is symbolic in non-30fps projects, so it should not be used as an exact frame coordinate.
+
+Verification:
+
+- `npm run lint` passed.
+- `npm run build` passed.
+
+### 2026-04-26 - Format Timeline Ruler Labels By Project Duration
+
+Files changed:
+
+- `src/features/editor/components/timeline/components/timeline-ruler.tsx`
+- `TIMELINE.md`
+- `MAINTENANCE_PLAN.md`
+
+Old:
+
+- Ruler labels always used `MM:SS:FF` style output.
+- `15f` markers could display full frame timecode labels even when the project duration did not need frame-level labels.
+
+New:
+
+- Ruler labels now use the real project playback duration.
+- Projects under 1 hour use `MM:SS`.
+- Projects from 1 hour upward use `HH:MM:SS`.
+- Frame labels are only emitted for very short projects when `15f` detail is active.
+- Non-essential `15f` markers remain as visual symbolic markers without full labels.
+
+Why:
+
+- The ruler should be easy to scan at normal project durations.
+- Frame precision is useful only when zoom/detail level requires it.
+- The `15f` marker should communicate sub-second spacing without cluttering the ruler.
+
+Benefits:
+
+- Cleaner ruler for normal projects.
+- Correct hour formatting for long projects.
+- Reduced label noise in `15f` mode.
+
+Tradeoffs / Risks:
+
+- Very short project frame-label threshold is currently conservative at 12 seconds and may need tuning after visual testing.
+
+Verification:
+
+- `npm run lint` passed.
+- `npm run build` passed.
+
+### 2026-04-26 - Normalize Timeline Ruler Tick Units
+
+Files changed:
+
+- `src/features/editor/components/timeline/index.tsx`
+- `src/features/editor/components/timeline/components/timeline-ruler.tsx`
+- `src/features/editor/lib/timeline-zoom-engine.ts`
+- `src/features/editor/lib/timeline-zoom-spec.ts`
+- `TIMELINE.md`
+- `MAINTENANCE_PLAN.md`
+
+Old:
+
+- Empty projects still went through the normal minimum tick count rule, so the ruler could show more time than needed.
+- Tick candidates included `2s`, `2m`, `15s`, and `15m`, which produced intervals like `0 | 2 | 4 | 6`.
+- `15f` mode generated a marker every 15 frames, which could show `:30f` and `:45f` on higher-FPS projects.
+
+New:
+
+- Empty projects now render about 1 second of ruler space.
+- Whole-time tick candidates follow `1 / 5 / 10 / 30 / 60` across seconds, minutes, and hours.
+- `15f` ruler mode only emits each second boundary plus the `+15f` marker.
+- `TimelineRuler` receives `tickUnit` explicitly so marker generation can distinguish `15f` behavior from whole-time tick spacing.
+
+Why:
+
+- The ruler should use predictable editing intervals and avoid uncommon `2x` units.
+- Frame-level marker mode should stay visually simple and avoid extra frame labels the user does not want.
+- Empty project state should feel lightweight instead of showing unnecessary timeline duration.
+
+Benefits:
+
+- Cleaner ruler labels.
+- More predictable zoom scale progression.
+- Empty projects start with a compact ruler.
+- The special `15f` behavior is isolated in ruler marker generation.
+
+Tradeoffs / Risks:
+
+- Removing `2x` and `15x` units means some durations may have slightly wider tick spacing than before.
+- Long-duration projects rely on `5h`, `10h`, and `30h` units for very coarse zoomed-out views.
+
+Verification:
+
+- `npm run lint` passed.
+- `npm run build` passed.
+
+### 2026-04-26 - Make Timeline Zoom Fit Viewport At 1x
+
+Files changed:
+
+- `src/features/editor/components/timeline/index.tsx`
+- `src/features/editor/lib/timeline-zoom-engine.ts`
+- `src/features/editor/lib/timeline-zoom-spec.ts`
+- `TIMELINE.md`
+- `MAINTENANCE_PLAN.md`
+
+Old:
+
+- Timeline zoom used a fixed minimum width.
+- `1x` zoom could still produce a horizontally wide timeline, so projects with different durations did not share a consistent "fit current screen" baseline.
+- Tick units came from a hardcoded duration bucket zoom map, not from actual pixel density.
+- Ruler padding existed, but width and tick spacing were not derived from the visible viewport.
+
+New:
+
+- Timeline measures the scroll viewport and passes the available body width into `computeTimelineZoom`.
+- At `1x`, timeline content width is based on the visible area after the track header.
+- Higher zoom levels expand from that viewport baseline.
+- Tick unit selection now uses real pixel density and target marker count, choosing a readable tick unit from frame/second/minute/hour candidates.
+- Visible duration still adds tail padding beyond project duration, then snaps to the chosen tick unit.
+
+Why:
+
+- The user wants `1x` to mean "fit the whole project into the current timeline screen" for projects from seconds to hours.
+- Clip width, ruler tick spacing, playhead movement, and drag frame math need one shared scale source.
+- A fixed minimum width made zoom behavior feel different depending on project duration and screen size.
+
+Benefits:
+
+- `1x` becomes a clear product contract.
+- Ruler ticks adapt to project duration and zoom level.
+- Long projects avoid dense unreadable labels at low zoom.
+- Zooming in reveals finer time detail while keeping clip/ruler/playhead math synchronized.
+
+Tradeoffs / Risks:
+
+- The zoom feel changes because the old fixed `1949px` baseline is no longer the default at `1x`.
+- Extremely long projects at `1x` necessarily compress clips heavily; usable editing still depends on zooming in.
+- Future testing should add unit coverage for representative durations: 9s, 3m30s, 10m, 1h, and 10h.
+
+Verification:
+
+- `npm run lint` passed.
+- `npm run build` passed.
+
 ### 2026-04-25 - Add Timeline Maintenance Baseline Document
 
 Files changed:

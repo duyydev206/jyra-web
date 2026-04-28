@@ -5,34 +5,90 @@ import {
     RULER_HEIGHT,
 } from "@/src/features/editor/lib/timeline-math";
 import { dispatchPreviewSeekFrame } from "@/src/features/editor/lib/preview-seek";
+import type { TickUnit } from "@/src/features/editor/lib/timeline-zoom-spec";
 
 type TimelineRulerProps = {
     fps: number;
     visibleDurationInFrames: Frames;
     maxSeekFrame: Frames;
+    tickUnit: TickUnit;
     tickFrames: Frames;
     timelineWidth: number;
     onSeekFrame?: (frame: number) => void;
     isInteractionDisabled?: boolean;
 };
 
-const formatTimecode = (frame: number, fps: number) => {
+const shouldShowFrameLabel = ({
+    frame,
+    fps,
+    tickUnit,
+    projectDurationInFrames,
+}: {
+    frame: number;
+    fps: number;
+    tickUnit: TickUnit;
+    projectDurationInFrames: Frames;
+}) => {
+    if (frame % fps === 0) return false;
+    if (tickUnit !== "15f") return false;
+
+    const projectDurationInSeconds = projectDurationInFrames / fps;
+
+    return projectDurationInSeconds <= 12;
+};
+
+const formatTimecode = ({
+    frame,
+    fps,
+    tickUnit,
+    projectDurationInFrames,
+    isSymbolicFrameMarker = false,
+}: {
+    frame: number;
+    fps: number;
+    tickUnit: TickUnit;
+    projectDurationInFrames: Frames;
+    isSymbolicFrameMarker?: boolean;
+}) => {
     const totalSeconds = Math.floor(frame / fps);
     const frames = frame % fps;
 
+    if (
+        frames > 0 &&
+        !isSymbolicFrameMarker &&
+        !shouldShowFrameLabel({ frame, fps, tickUnit, projectDurationInFrames })
+    ) {
+        return "";
+    }
+
+    const hours = Math.floor(totalSeconds / 3600)
+        .toString()
+        .padStart(2, "0");
     const minutes = Math.floor(totalSeconds / 60)
         .toString()
         .padStart(2, "0");
     const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-    const frameText = frames.toString().padStart(2, "0");
 
-    return `${minutes}:${seconds}:${frameText}${frameText !== "00" ? "f" : ""}`;
+    if (projectDurationInFrames >= fps * 3600) {
+        return `${hours}:${minutes}:${seconds}`;
+    }
+
+    if (tickUnit === "15f") {
+        const frameText = isSymbolicFrameMarker
+            ? "15"
+            : frames.toString().padStart(2, "0");
+
+        return `${minutes}:${seconds}:${frameText}`;
+    }
+
+    return `${minutes}:${seconds}`;
 };
 
 const TimelineRuler: React.FC<TimelineRulerProps> = ({
     fps,
     visibleDurationInFrames,
     maxSeekFrame,
+    tickUnit,
     tickFrames,
     timelineWidth,
     onSeekFrame,
@@ -44,16 +100,70 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
     const pixelsPerFrame =
         visibleDurationInFrames > 0 ? usableWidth / visibleDurationInFrames : 0;
 
-    const tickCount = Math.floor(visibleDurationInFrames / tickFrames);
+    const getMarkers = () => {
+        if (tickUnit !== "15f") {
+            const tickCount = Math.floor(visibleDurationInFrames / tickFrames);
 
-    const markers = Array.from({ length: tickCount + 1 }, (_, index) => {
-        const frame = index * tickFrames;
+            return Array.from({ length: tickCount + 1 }, (_, index) => {
+                const frame = index * tickFrames;
+
+                return {
+                    key: String(frame),
+                    frame,
+                    labelFrame: frame,
+                    isSymbolicFrameMarker: false,
+                };
+            });
+        }
+
+        const markers: {
+            key: string;
+            frame: Frames;
+            labelFrame: Frames;
+            isSymbolicFrameMarker: boolean;
+        }[] = [];
+
+        for (
+            let secondStartFrame = 0;
+            secondStartFrame <= visibleDurationInFrames;
+            secondStartFrame += fps
+        ) {
+            markers.push({
+                key: String(secondStartFrame),
+                frame: secondStartFrame,
+                labelFrame: secondStartFrame,
+                isSymbolicFrameMarker: false,
+            });
+
+            const symbolicFrame = secondStartFrame + fps / 2;
+            if (symbolicFrame < visibleDurationInFrames) {
+                markers.push({
+                    key: `${secondStartFrame}:15f`,
+                    frame: symbolicFrame,
+                    labelFrame: secondStartFrame + 15,
+                    isSymbolicFrameMarker: true,
+                });
+            }
+        }
+
+        return markers;
+    };
+
+    const markers = getMarkers().map((marker) => {
+        const { frame, labelFrame, isSymbolicFrameMarker } = marker;
         const left = TIMELINE_GUTTER_X + frame * pixelsPerFrame;
 
         return {
+            key: marker.key,
             frame,
             left,
-            label: formatTimecode(frame, fps),
+            label: formatTimecode({
+                frame: labelFrame,
+                fps,
+                tickUnit,
+                projectDurationInFrames: maxSeekFrame,
+                isSymbolicFrameMarker,
+            }),
         };
     });
 
@@ -131,7 +241,7 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
                 }}>
                 {markers.map((marker) => (
                     <div
-                        key={marker.frame}
+                        key={marker.key}
                         className='absolute top-0 h-7'
                         style={{
                             left: marker.left,

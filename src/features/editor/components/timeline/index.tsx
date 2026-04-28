@@ -153,6 +153,7 @@ const Timeline: React.FC = () => {
     } | null>(null);
     const [horizontalScrollbarHeight, setHorizontalScrollbarHeight] =
         useState(0);
+    const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
     const [clipDropPreview, setClipDropPreview] =
         useState<ClipDropPreview | null>(null);
     const [draggingClipId, setDraggingClipId] = useState<string | null>(null);
@@ -198,6 +199,7 @@ const Timeline: React.FC = () => {
         durationInFrames,
         fps,
         zoomLevel: zoomValue,
+        viewportWidth: Math.max(0, timelineViewportWidth - TRACK_HEADER_WIDTH),
     });
 
     const laneResult = useMemo(() => {
@@ -698,6 +700,7 @@ const Timeline: React.FC = () => {
             setHorizontalScrollbarHeight(
                 Math.max(0, viewport.offsetHeight - viewport.clientHeight),
             );
+            setTimelineViewportWidth(viewport.clientWidth);
         };
 
         syncScrollbarMetrics();
@@ -844,6 +847,8 @@ const Timeline: React.FC = () => {
                                 className='relative min-h-full w-full'
                                 ref={timelineContentRef}
                                 style={{
+                                    width: zoomComputed.timelineWidth,
+                                    flex: "0 0 auto",
                                     height: timelineContentHeight,
                                 }}>
                                 {/* ===== Tick header =====*/}
@@ -853,6 +858,7 @@ const Timeline: React.FC = () => {
                                         zoomComputed.visibleDurationInFrames
                                     }
                                     maxSeekFrame={playbackDurationInFrames}
+                                    tickUnit={zoomComputed.tickUnit}
                                     tickFrames={zoomComputed.tickFrames}
                                     timelineWidth={zoomComputed.timelineWidth}
                                     onSeekFrame={seekToFrame}

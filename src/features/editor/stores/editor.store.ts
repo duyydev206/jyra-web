@@ -1296,6 +1296,200 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         }));
     },
 
+    updateProjectVideoConfig: (videoConfig) => {
+        set((state) => {
+            const nextVideo = {
+                ...state.project.video,
+                ...videoConfig,
+                width:
+                    videoConfig.width == null
+                        ? state.project.video.width
+                        : Math.max(1, Math.round(videoConfig.width)),
+                height:
+                    videoConfig.height == null
+                        ? state.project.video.height
+                        : Math.max(1, Math.round(videoConfig.height)),
+                fps:
+                    videoConfig.fps == null
+                        ? state.project.video.fps
+                        : Math.max(1, Math.round(videoConfig.fps)),
+            };
+            const nextProject = {
+                ...state.project,
+                video: nextVideo,
+            };
+
+            return {
+                project: nextProject,
+                runtime: {
+                    ...state.runtime,
+                    player: {
+                        ...state.runtime.player,
+                        currentFrame: clampFrame(
+                            state.runtime.player.currentFrame,
+                            getEditorPlaybackDurationInFrames(nextProject),
+                        ),
+                    },
+                },
+            };
+        });
+    },
+
+    updateClipTiming: ({ clipId, from, durationInFrames }) => {
+        set((state) => {
+            const clips = state.project.clips.map((clip) => {
+                if (clip.id !== clipId) {
+                    return clip;
+                }
+
+                return {
+                    ...clip,
+                    from:
+                        from == null ? clip.from : Math.max(0, Math.round(from)),
+                    durationInFrames:
+                        durationInFrames == null
+                            ? clip.durationInFrames
+                            : Math.max(1, Math.round(durationInFrames)),
+                };
+            });
+            const nextDurationInFrames = getProjectDurationInFrames(clips);
+            const nextProject = {
+                ...state.project,
+                clips,
+                video: {
+                    ...state.project.video,
+                    durationInFrames: nextDurationInFrames,
+                },
+            };
+
+            return {
+                project: nextProject,
+                runtime: {
+                    ...state.runtime,
+                    player: {
+                        ...state.runtime.player,
+                        currentFrame: clampFrame(
+                            state.runtime.player.currentFrame,
+                            getEditorPlaybackDurationInFrames(nextProject),
+                        ),
+                    },
+                },
+            };
+        });
+    },
+
+    updateTextClipContent: ({ clipId, text }) => {
+        set((state) => ({
+            project: {
+                ...state.project,
+                clips: state.project.clips.map((clip) => {
+                    if (clip.id !== clipId || clip.type !== "text") {
+                        return clip;
+                    }
+
+                    return {
+                        ...clip,
+                        text,
+                        label: text.trim() || "Text",
+                    };
+                }),
+            },
+        }));
+    },
+
+    updateTextClipStyle: ({ clipId, style }) => {
+        set((state) => ({
+            project: {
+                ...state.project,
+                clips: state.project.clips.map((clip) => {
+                    if (clip.id !== clipId || clip.type !== "text") {
+                        return clip;
+                    }
+
+                    return {
+                        ...clip,
+                        style: {
+                            ...clip.style,
+                            ...style,
+                        },
+                    };
+                }),
+            },
+        }));
+    },
+
+    updateMediaClipSettings: ({ clipId, volume, playbackRate, isMuted }) => {
+        set((state) => ({
+            project: {
+                ...state.project,
+                clips: state.project.clips.map((clip) => {
+                    if (clip.id !== clipId) {
+                        return clip;
+                    }
+
+                    if (clip.type !== "video" && clip.type !== "audio") {
+                        return clip;
+                    }
+
+                    return {
+                        ...clip,
+                        volume:
+                            volume == null
+                                ? clip.volume
+                                : clamp(volume, 0, 1),
+                        playbackRate:
+                            playbackRate == null
+                                ? clip.playbackRate
+                                : Math.max(0.1, playbackRate),
+                        isMuted: isMuted == null ? clip.isMuted : isMuted,
+                    };
+                }),
+            },
+        }));
+    },
+
+    updateImageClipSettings: ({ clipId, objectFit }) => {
+        set((state) => ({
+            project: {
+                ...state.project,
+                clips: state.project.clips.map((clip) => {
+                    if (clip.id !== clipId || clip.type !== "image") {
+                        return clip;
+                    }
+
+                    return {
+                        ...clip,
+                        objectFit: objectFit ?? clip.objectFit,
+                    };
+                }),
+            },
+        }));
+    },
+
+    updateShapeClipStyle: ({ clipId, shapeType, fill, stroke, strokeWidth }) => {
+        set((state) => ({
+            project: {
+                ...state.project,
+                clips: state.project.clips.map((clip) => {
+                    if (clip.id !== clipId || clip.type !== "shape") {
+                        return clip;
+                    }
+
+                    return {
+                        ...clip,
+                        shapeType: shapeType ?? clip.shapeType,
+                        fill: fill ?? clip.fill,
+                        stroke: stroke ?? clip.stroke,
+                        strokeWidth:
+                            strokeWidth == null
+                                ? clip.strokeWidth
+                                : Math.max(0, strokeWidth),
+                    };
+                }),
+            },
+        }));
+    },
+
     startTextEditing: ({ clipId, draftText }) => {
         set((state) => ({
             runtime: {
